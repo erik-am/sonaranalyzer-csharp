@@ -44,6 +44,29 @@
             Return 0
         End Function
 
+        Public Shared Operator ^() As Integer  ' Compliant
+            If False
+
+            End If
+            If False
+
+            End If
+            Return 0
+        End Operator
+
+        Public Shared Operator &() As Integer  ' Noncompliant
+            If False
+
+            End If
+            If False
+
+            End If
+            If False
+
+            End If
+            Return 0
+        End Operator
+
         Public Property P1 As Integer
             Get ' Compliant
                 If False

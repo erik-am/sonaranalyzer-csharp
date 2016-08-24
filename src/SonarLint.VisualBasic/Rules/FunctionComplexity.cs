@@ -53,6 +53,10 @@ namespace SonarLint.Rules.VisualBasic
             context.RegisterSyntaxNodeActionInNonGenerated(
                 c => CheckComplexity<AccessorBlockSyntax>(c, m => m.AccessorStatement.GetLocation()),
                 SyntaxKind.SetAccessorBlock);
+
+            context.RegisterSyntaxNodeActionInNonGenerated(
+                c => CheckComplexity<OperatorBlockSyntax>(c, m => m.OperatorStatement.GetLocation()),
+                SyntaxKind.OperatorBlock);
         }
 
         protected override int GetComplexity(SyntaxNode node)
