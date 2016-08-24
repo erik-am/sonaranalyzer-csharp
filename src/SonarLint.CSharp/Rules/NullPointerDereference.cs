@@ -49,7 +49,7 @@ namespace SonarLint.Rules.CSharp
             "A reference to \"null\" should never be dereferenced/accessed. Doing so will cause a \"NullReferenceException\" to be thrown. " +
             "At best, such an exception will cause abrupt program termination. At worst, it could expose debugging information that would " +
             "be useful to an attacker, or it could allow an attacker to bypass security measures.";
-        internal const string MessageFormat = "\"{0}\" is null{1}.";
+        internal const string MessageFormat = "\"{0}\" is null on at least one execution path.";
         internal const string Category = SonarLint.Common.Category.Reliability;
         internal const Severity RuleSeverity = Severity.Blocker;
         internal const bool IsActivatedByDefault = true;
@@ -73,10 +73,9 @@ namespace SonarLint.Rules.CSharp
             explodedGraph.AddExplodedGraphCheck(nullPointerCheck);
 
             var nullIdentifiers = new HashSet<IdentifierNameSyntax>();
-            var nonNullIdentifiers = new HashSet<IdentifierNameSyntax>();
 
             EventHandler<MemberAccessedEventArgs> memberAccessedHandler =
-                (sender, args) => CollectMemberAccesses(args, nullIdentifiers, nonNullIdentifiers, context.SemanticModel);
+                (sender, args) => CollectMemberAccesses(args, nullIdentifiers, context.SemanticModel);
 
             nullPointerCheck.MemberAccessed += memberAccessedHandler;
 
@@ -91,30 +90,17 @@ namespace SonarLint.Rules.CSharp
 
             foreach (var nullIdentifier in nullIdentifiers)
             {
-                var messageEnd = string.Empty;
-                if (nonNullIdentifiers.Contains(nullIdentifier))
-                {
-                    // Only report on cases where we are (almost) sure
-                    continue;
-                }
-
-                context.ReportDiagnostic(Diagnostic.Create(Rule, nullIdentifier.GetLocation(), nullIdentifier.Identifier.ValueText, messageEnd));
+                context.ReportDiagnostic(Diagnostic.Create(Rule, nullIdentifier.GetLocation(), nullIdentifier.Identifier.ValueText));
             }
         }
 
         private static void CollectMemberAccesses(MemberAccessedEventArgs args, HashSet<IdentifierNameSyntax> nullIdentifiers,
-            HashSet<IdentifierNameSyntax> nonNullIdentifiers, SemanticModel semanticModel)
+            SemanticModel semanticModel)
         {
-            if (args.IsNull)
+            if (args.IsNull &&
+                !NullPointerCheck.IsExtensionMethod(args.Identifier.Parent, semanticModel))
             {
-                if (!NullPointerCheck.IsExtensionMethod(args.Identifier.Parent, semanticModel))
-                {
-                    nullIdentifiers.Add(args.Identifier);
-                }
-            }
-            else
-            {
-                nonNullIdentifiers.Add(args.Identifier);
+                nullIdentifiers.Add(args.Identifier);
             }
         }
 
@@ -146,21 +132,22 @@ namespace SonarLint.Rules.CSharp
                         return ProcessIdentifier(programPoint, programState, (IdentifierNameSyntax)instruction);
 
                     case SyntaxKind.AwaitExpression:
-                        return ProcessAwait(programState, instruction);
+                        return ProcessAwait(programState, (AwaitExpressionSyntax)instruction);
 
                     case SyntaxKind.SimpleMemberAccessExpression:
                     case SyntaxKind.PointerMemberAccessExpression:
-                        return ProcessMemberAccess(programState, instruction);
+                        return ProcessMemberAccess(programState, (MemberAccessExpressionSyntax)instruction);
+
+                    case SyntaxKind.ElementAccessExpression:
+                        return ProcessElementAccess(programState, (ElementAccessExpressionSyntax)instruction);
 
                     default:
                         return programState;
                 }
             }
 
-            private ProgramState ProcessAwait(ProgramState programState, SyntaxNode instruction)
+            private ProgramState ProcessAwait(ProgramState programState, AwaitExpressionSyntax awaitExpression)
             {
-                var awaitExpression = (AwaitExpressionSyntax)instruction;
-
                 var identifier = awaitExpression.Expression as IdentifierNameSyntax;
                 if (identifier == null)
                 {
@@ -170,10 +157,21 @@ namespace SonarLint.Rules.CSharp
                 return GetNewProgramStateFromIdentifier(programState, identifier);
             }
 
-            private ProgramState ProcessMemberAccess(ProgramState programState, SyntaxNode instruction)
+            private ProgramState ProcessElementAccess(ProgramState programState, ElementAccessExpressionSyntax elementAccess)
             {
-                var memberAccess = (MemberAccessExpressionSyntax)instruction;
+                var identifier = elementAccess.Expression as IdentifierNameSyntax;
+                return ProcessAccessedIdentifier(identifier, elementAccess, programState);
+            }
+
+
+            private ProgramState ProcessMemberAccess(ProgramState programState, MemberAccessExpressionSyntax memberAccess)
+            {
                 var identifier = memberAccess.Expression as IdentifierNameSyntax;
+                return ProcessAccessedIdentifier(identifier, memberAccess, programState);
+            }
+
+            private ProgramState ProcessAccessedIdentifier(IdentifierNameSyntax identifier, ExpressionSyntax expression, ProgramState programState)
+            {
                 if (identifier == null)
                 {
                     return programState;
@@ -191,7 +189,7 @@ namespace SonarLint.Rules.CSharp
                     OnMemberAccessed(identifier, isNull: true);
 
                     // Extension methods don't fail on null:
-                    return IsExtensionMethod(memberAccess, semanticModel)
+                    return IsExtensionMethod(expression, semanticModel)
                         ? programState
                         : null;
                 }
@@ -253,9 +251,9 @@ namespace SonarLint.Rules.CSharp
                     successorBlock.BranchingNode.IsKind(SyntaxKind.ForEachStatement);
             }
 
-            internal static bool IsExtensionMethod(SyntaxNode memberAccess, SemanticModel semanticModel)
+            internal static bool IsExtensionMethod(SyntaxNode expression, SemanticModel semanticModel)
             {
-                var memberSymbol = semanticModel.GetSymbolInfo(memberAccess).Symbol as IMethodSymbol;
+                var memberSymbol = semanticModel.GetSymbolInfo(expression).Symbol as IMethodSymbol;
                 return memberSymbol != null && memberSymbol.IsExtensionMethod;
             }
         }

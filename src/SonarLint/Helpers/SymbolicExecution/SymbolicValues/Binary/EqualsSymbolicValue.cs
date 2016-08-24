@@ -18,50 +18,30 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02
  */
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace SonarLint.Helpers.FlowAnalysis.Common
 {
-    public class EqualsSymbolicValue : RelationalSymbolicValue
+    public abstract class EqualsSymbolicValue : EqualityLikeSymbolicValue
     {
-        public EqualsSymbolicValue(SymbolicValue leftOperand, SymbolicValue rightOperand)
+        protected EqualsSymbolicValue(SymbolicValue leftOperand, SymbolicValue rightOperand)
             : base(leftOperand, rightOperand)
         {
         }
 
-        public override IEnumerable<ProgramState> TrySetConstraint(SymbolicValueConstraint constraint, ProgramState currentProgramState)
+        internal override IEnumerable<ProgramState> SetConstraint(BoolConstraint boolConstraint,
+            SymbolicValueConstraint leftConstraint, SymbolicValueConstraint rightConstraint,
+            ProgramState programState)
         {
-            var boolConstraint = constraint as BoolConstraint;
-            if (boolConstraint == null)
-            {
-                return new[] { currentProgramState };
-            }
-
-            SymbolicValueConstraint leftConstraint;
-            var leftHasConstraint = leftOperand.TryGetConstraint(currentProgramState, out leftConstraint);
-            SymbolicValueConstraint rightConstraint;
-            var rightHasConstraint = rightOperand.TryGetConstraint(currentProgramState, out rightConstraint);
-
-            if (!rightHasConstraint && !leftHasConstraint)
-            {
-                return new[] { currentProgramState };
-            }
-
             if (boolConstraint == BoolConstraint.True)
             {
-                return rightOperand.TrySetConstraint(leftConstraint, currentProgramState)
+                return rightOperand.TrySetConstraint(leftConstraint, programState)
                     .SelectMany(ps => leftOperand.TrySetConstraint(rightConstraint, ps));
             }
 
-            return rightOperand.TrySetConstraint(leftConstraint?.OppositeForLogicalNot, currentProgramState)
+            return rightOperand.TrySetConstraint(leftConstraint?.OppositeForLogicalNot, programState)
                 .SelectMany(ps => leftOperand.TrySetConstraint(rightConstraint?.OppositeForLogicalNot, ps));
-        }
-
-        public override string ToString()
-        {
-            return leftOperand + " == " + rightOperand;
         }
     }
 }

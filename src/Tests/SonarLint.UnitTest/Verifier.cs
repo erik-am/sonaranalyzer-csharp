@@ -107,7 +107,11 @@ namespace SonarLint.UnitTest
                         var expectedMessage = expectedIssues[line];
                         if (expectedMessage != null)
                         {
-                            diagnostic.GetMessage().ShouldBeEquivalentTo(expectedMessage);
+                            var message = diagnostic.GetMessage();
+
+                            Assert.AreEqual(expectedMessage,
+                                message,
+                                $"Message does not match expected on line {line}");
                         }
 
                         if (expectedLocations.ContainsKey(line))
@@ -278,9 +282,12 @@ namespace SonarLint.UnitTest
         {
             if (fileExtension == CSharpFileExtension)
             {
-                var csOptions = options as CS.CSharpParseOptions ?? new CS.CSharpParseOptions();
-                yield return csOptions.WithLanguageVersion(CS.LanguageVersion.CSharp6);
-                yield return csOptions.WithLanguageVersion(CS.LanguageVersion.CSharp5);
+                if (options == null)
+                {
+                    var csOptions = new CS.CSharpParseOptions();
+                    yield return csOptions.WithLanguageVersion(CS.LanguageVersion.CSharp6);
+                    yield return csOptions.WithLanguageVersion(CS.LanguageVersion.CSharp5);
+                }
                 yield break;
             }
 

@@ -20,6 +20,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 
 namespace SonarLint.Helpers.FlowAnalysis.Common
@@ -29,12 +30,38 @@ namespace SonarLint.Helpers.FlowAnalysis.Common
         public static readonly SymbolicValue True = new BoolLiteralSymbolicValue(true);
         public static readonly SymbolicValue False = new BoolLiteralSymbolicValue(false);
         public static readonly SymbolicValue Null = new NullSymbolicValue();
+        public static readonly SymbolicValue This = new ThisSymbolicValue();
+        public static readonly SymbolicValue Base = new BaseSymbolicValue();
 
         private class BoolLiteralSymbolicValue : SymbolicValue
         {
             internal BoolLiteralSymbolicValue(bool value)
                 : base(value)
             {
+            }
+        }
+
+        private class ThisSymbolicValue : SymbolicValue
+        {
+            internal ThisSymbolicValue()
+                : base(new object())
+            {
+            }
+            public override string ToString()
+            {
+                return "SV_THIS";
+            }
+        }
+
+        private class BaseSymbolicValue : SymbolicValue
+        {
+            internal BaseSymbolicValue()
+                : base(new object())
+            {
+            }
+            public override string ToString()
+            {
+                return "SV_BASE";
             }
         }
 
@@ -46,14 +73,16 @@ namespace SonarLint.Helpers.FlowAnalysis.Common
             }
             public override string ToString()
             {
-                return "SymbolicValue NULL";
+                return "SV_NULL";
             }
         }
 
         private readonly object identifier;
 
+        private static int SymbolicValueCounter = 0;
+
         internal SymbolicValue()
-            : this(new object())
+            : this(SymbolicValueCounter++)
         {
         }
 
@@ -66,7 +95,7 @@ namespace SonarLint.Helpers.FlowAnalysis.Common
         {
             if (identifier != null)
             {
-                return "SymbolicValue " + identifier;
+                return "SV_" + identifier;
             }
 
             return base.ToString();
@@ -79,11 +108,54 @@ namespace SonarLint.Helpers.FlowAnalysis.Common
                 return programState;
             }
 
+            var newConstraints = programState.Constraints.SetItem(this, constraint);
+            newConstraints = AddConstraintTo<EqualsRelationship>(constraint, programState, newConstraints);
+
+            if (constraint is BoolConstraint)
+            {
+                newConstraints = AddConstraintTo<NotEqualsRelationship>(constraint.OppositeForLogicalNot, programState, newConstraints);
+            }
+
             return new ProgramState(
                 programState.Values,
-                programState.Constraints.SetItem(this, constraint),
+                newConstraints,
                 programState.ProgramPointVisitCounts,
-                programState.ExpressionStack);
+                programState.ExpressionStack,
+                programState.Relationships);
+        }
+
+        private ImmutableDictionary<SymbolicValue, SymbolicValueConstraint> AddConstraintTo<TRelationship>(SymbolicValueConstraint constraint,
+            ProgramState programState, ImmutableDictionary<SymbolicValue, SymbolicValueConstraint> constraints)
+            where TRelationship: BinaryRelationship
+        {
+            var newConstraints = constraints;
+            var equalSymbols = programState.Relationships
+                            .OfType<TRelationship>()
+                            .Select(r => GetOtherOperandFromMatchingRelationship(r))
+                            .Where(e => e != null);
+
+            foreach (var equalSymbol in equalSymbols.Where(e => !e.HasConstraint(constraint, programState)))
+            {
+                newConstraints = newConstraints.SetItem(equalSymbol, constraint);
+            }
+
+            return newConstraints;
+        }
+
+        private SymbolicValue GetOtherOperandFromMatchingRelationship(BinaryRelationship relationship)
+        {
+            if (relationship.RightOperand == this)
+            {
+                return relationship.LeftOperand;
+            }
+            else if (relationship.LeftOperand == this)
+            {
+                return relationship.RightOperand;
+            }
+            else
+            {
+                return null;
+            }
         }
 
         public bool HasConstraint(SymbolicValueConstraint constraint, ProgramState programState)

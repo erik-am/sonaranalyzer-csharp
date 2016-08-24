@@ -104,6 +104,14 @@ namespace SonarLint.Helpers.FlowAnalysis.Common
                     continue;
                 }
 
+                var singleSuccessorBinaryBranchBlock = programPoint.Block as BinaryBranchingSimpleBlock;
+                if (singleSuccessorBinaryBranchBlock != null)
+                {
+                    // Right operand of logical && and ||
+                    VisitSingleSuccessorBinaryBranch(singleSuccessorBinaryBranchBlock, node);
+                    continue;
+                }
+
                 var simpleBlock = programPoint.Block as SimpleBlock;
                 if (simpleBlock != null)
                 {
@@ -173,12 +181,11 @@ namespace SonarLint.Helpers.FlowAnalysis.Common
             });
         }
 
-        protected void OnConditionEvaluated(SyntaxNode condition, SyntaxNode branchingNode, bool evaluationValue)
+        protected void OnConditionEvaluated(SyntaxNode condition, bool evaluationValue)
         {
             ConditionEvaluated?.Invoke(this, new ConditionEvaluatedEventArgs
             {
                 Condition = condition,
-                BranchingNode = branchingNode,
                 EvaluationValue = evaluationValue
             });
         }
@@ -196,6 +203,24 @@ namespace SonarLint.Helpers.FlowAnalysis.Common
             var newProgramState = node.ProgramState.PopValue();
             newProgramState = CleanStateAfterBlock(newProgramState, node.ProgramPoint.Block);
             EnqueueAllSuccessors(programPoint.Block, newProgramState);
+        }
+
+        protected virtual void VisitSingleSuccessorBinaryBranch(BinaryBranchingSimpleBlock block, ExplodedGraphNode node)
+        {
+            var programState = node.ProgramState;
+            var sv = programState.PeekValue();
+
+            foreach (var newProgramState in sv.TrySetConstraint(BoolConstraint.True, programState))
+            {
+                OnConditionEvaluated(block.BranchingInstruction, evaluationValue: true);
+                EnqueueNewNode(new ProgramPoint(block.SuccessorBlock), newProgramState);
+            }
+
+            foreach (var newProgramState in sv.TrySetConstraint(BoolConstraint.False, programState))
+            {
+                OnConditionEvaluated(block.BranchingInstruction, evaluationValue: false);
+                EnqueueNewNode(new ProgramPoint(block.SuccessorBlock), newProgramState);
+            }
         }
 
         protected virtual void VisitSimpleBlock(SimpleBlock block, ExplodedGraphNode node)
@@ -252,7 +277,9 @@ namespace SonarLint.Helpers.FlowAnalysis.Common
             var initialProgramState = new ProgramState();
             foreach (var parameter in declarationParameters)
             {
-                initialProgramState = initialProgramState.SetSymbolicValue(parameter, new SymbolicValue());
+                var sv = new SymbolicValue();
+                initialProgramState = initialProgramState.SetSymbolicValue(parameter, sv);
+                initialProgramState = SetNonNullConstraintIfValueType(parameter, sv, initialProgramState);
             }
 
             EnqueueNewNode(new ProgramPoint(cfg.EntryBlock), initialProgramState);
@@ -303,19 +330,26 @@ namespace SonarLint.Helpers.FlowAnalysis.Common
             if (IsLocalScoped(symbol))
             {
                 var newProgramState = programState.SetSymbolicValue(symbol, symbolicValue);
-                if (IsNonNullableValueType(symbol))
-                {
-                    newProgramState = symbolicValue.SetConstraint(ObjectConstraint.NotNull, newProgramState);
-                }
-                return newProgramState;
+                return SetNonNullConstraintIfValueType(symbol, symbolicValue, newProgramState);
             }
 
             return programState;
         }
 
+        private static ProgramState SetNonNullConstraintIfValueType(ISymbol symbol, SymbolicValue symbolicValue, ProgramState programState)
+        {
+            return IsNonNullableValueType(symbol)
+                ? symbolicValue.SetConstraint(ObjectConstraint.NotNull, programState)
+                : programState;
+        }
+
         private static bool IsNonNullableValueType(ISymbol symbol)
         {
-            var type = symbol.GetSymbolType();
+            return IsNonNullableValueType(symbol.GetSymbolType());
+        }
+
+        protected static bool IsNonNullableValueType(ITypeSymbol type)
+        {
             return type.IsStruct() &&
                 !type.OriginalDefinition.Is(KnownType.System_Nullable_T);
         }

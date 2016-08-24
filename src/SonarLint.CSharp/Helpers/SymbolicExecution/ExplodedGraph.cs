@@ -187,9 +187,17 @@ namespace SonarLint.Helpers.FlowAnalysis.CSharp
                     break;
 
                 case SyntaxKind.LessThanExpression:
+                    newProgramState = VisitBinaryOperator(newProgramState, (l, r) => new ComparisonSymbolicValue(ComparisonKind.Less, l, r));
+                    break;
                 case SyntaxKind.LessThanOrEqualExpression:
+                    newProgramState = VisitBinaryOperator(newProgramState, (l, r) => new ComparisonSymbolicValue(ComparisonKind.LessOrEqual, l, r));
+                    break;
                 case SyntaxKind.GreaterThanExpression:
+                    newProgramState = VisitBinaryOperator(newProgramState, (l, r) => new ComparisonSymbolicValue(ComparisonKind.Less, r, l));
+                    break;
                 case SyntaxKind.GreaterThanOrEqualExpression:
+                    newProgramState = VisitBinaryOperator(newProgramState, (l, r) => new ComparisonSymbolicValue(ComparisonKind.LessOrEqual, r, l));
+                    break;
 
                 case SyntaxKind.SubtractExpression:
                 case SyntaxKind.AddExpression:
@@ -205,11 +213,15 @@ namespace SonarLint.Helpers.FlowAnalysis.CSharp
                     break;
 
                 case SyntaxKind.EqualsExpression:
-                    newProgramState = VisitBinaryOperator(newProgramState, (l, r) => new EqualsSymbolicValue(l, r));
+                    newProgramState = IsOperatorOnObject(instruction)
+                        ? VisitBinaryOperator(newProgramState, (l, r) => new ReferenceEqualsSymbolicValue(l, r))
+                        : VisitBinaryOperator(newProgramState, (l, r) => new ValueEqualsSymbolicValue(l, r));
                     break;
 
                 case SyntaxKind.NotEqualsExpression:
-                    newProgramState = VisitBinaryOperator(newProgramState, (l, r) => new NotEqualsSymbolicValue(l, r));
+                    newProgramState = IsOperatorOnObject(instruction)
+                        ? VisitBinaryOperator(newProgramState, (l, r) => new ReferenceNotEqualsSymbolicValue(l, r))
+                        : VisitBinaryOperator(newProgramState, (l, r) => new ValueNotEqualsSymbolicValue(l, r));
                     break;
 
                 case SyntaxKind.BitwiseNotExpression:
@@ -243,8 +255,9 @@ namespace SonarLint.Helpers.FlowAnalysis.CSharp
                             !check.TryProcessInstruction((MemberAccessExpressionSyntax)instruction, newProgramState, out newProgramState))
                         {
                             // Default behavior
-                            newProgramState = newProgramState.PopValue();
-                            newProgramState = newProgramState.PushValue(new SymbolicValue());
+                            SymbolicValue memberExpression;
+                            newProgramState = newProgramState.PopValue(out memberExpression);
+                            newProgramState = newProgramState.PushValue(new MemberAccessSymbolicValue(memberExpression));
                         }
                     }
                     break;
@@ -283,14 +296,18 @@ namespace SonarLint.Helpers.FlowAnalysis.CSharp
                 case SyntaxKind.NullLiteralExpression:
                     newProgramState = newProgramState.PushValue(SymbolicValue.Null);
                     break;
+
+                case SyntaxKind.ThisExpression:
+                    newProgramState = newProgramState.PushValue(SymbolicValue.This);
+                    break;
+                case SyntaxKind.BaseExpression:
+                    newProgramState = newProgramState.PushValue(SymbolicValue.Base);
+                    break;
+
                 case SyntaxKind.CharacterLiteralExpression:
                 case SyntaxKind.StringLiteralExpression:
                 case SyntaxKind.NumericLiteralExpression:
 
-                case SyntaxKind.ThisExpression:
-                case SyntaxKind.BaseExpression:
-
-                case SyntaxKind.DefaultExpression:
                 case SyntaxKind.SizeOfExpression:
                 case SyntaxKind.TypeOfExpression:
 
@@ -300,6 +317,20 @@ namespace SonarLint.Helpers.FlowAnalysis.CSharp
                     {
                         var sv = new SymbolicValue();
                         newProgramState = sv.SetConstraint(ObjectConstraint.NotNull, newProgramState);
+                        newProgramState = newProgramState.PushValue(sv);
+                    }
+                    break;
+
+                case SyntaxKind.DefaultExpression:
+                    {
+                        var type = SemanticModel.GetTypeInfo(instruction).Type;
+                        var sv = new SymbolicValue();
+
+                        if (IsNonNullableValueType(type))
+                        {
+                            newProgramState = sv.SetConstraint(ObjectConstraint.NotNull, newProgramState);
+                        }
+
                         newProgramState = newProgramState.PushValue(sv);
                     }
                     break;
@@ -327,8 +358,7 @@ namespace SonarLint.Helpers.FlowAnalysis.CSharp
                     break;
 
                 case SyntaxKind.InvocationExpression:
-                    newProgramState = newProgramState.PopValues((((InvocationExpressionSyntax)instruction).ArgumentList?.Arguments.Count ?? 0) + 1);
-                    newProgramState = newProgramState.PushValue(new SymbolicValue());
+                    newProgramState = new InvocationVisitor((InvocationExpressionSyntax)instruction, SemanticModel).GetChangedProgramState(newProgramState);
                     break;
 
                 case SyntaxKind.ObjectCreationExpression:
@@ -451,7 +481,7 @@ namespace SonarLint.Helpers.FlowAnalysis.CSharp
 
             foreach (var newProgramState in sv.TrySetConstraint(BoolConstraint.True, ps))
             {
-                OnConditionEvaluated(instruction, binaryBranchBlock.BranchingNode, evaluationValue: true);
+                OnConditionEvaluated(instruction, evaluationValue: true);
 
                 var nps = binaryBranchBlock.BranchingNode.IsKind(SyntaxKind.LogicalOrExpression)
                     ? newProgramState.PushValue(SymbolicValue.True)
@@ -462,7 +492,7 @@ namespace SonarLint.Helpers.FlowAnalysis.CSharp
 
             foreach (var newProgramState in sv.TrySetConstraint(BoolConstraint.False, ps))
             {
-                OnConditionEvaluated(instruction, binaryBranchBlock.BranchingNode, evaluationValue: false);
+                OnConditionEvaluated(instruction, evaluationValue: false);
 
                 var nps = binaryBranchBlock.BranchingNode.IsKind(SyntaxKind.LogicalAndExpression)
                     ? newProgramState.PushValue(SymbolicValue.False)
@@ -492,13 +522,23 @@ namespace SonarLint.Helpers.FlowAnalysis.CSharp
            return newProgramState.PushValue(resultValue);
         }
 
-        private static ProgramState VisitBinaryOperator(ProgramState programState, Func<SymbolicValue, SymbolicValue, SymbolicValue> symbolicValueFactory)
+        private bool IsOperatorOnObject(SyntaxNode instruction)
+        {
+            var operatorSymbol = SemanticModel.GetSymbolInfo(instruction).Symbol as IMethodSymbol;
+            return operatorSymbol != null &&
+                operatorSymbol.ContainingType.Is(KnownType.System_Object);
+        }
+
+        private static ProgramState VisitBinaryOperator(ProgramState programState,
+            Func<SymbolicValue, SymbolicValue, SymbolicValue> svFactory)
         {
             SymbolicValue leftSymbol;
             SymbolicValue rightSymbol;
-            var newProgramState = programState.PopValue(out leftSymbol);
-            newProgramState = newProgramState.PopValue(out rightSymbol);
-            return newProgramState.PushValue(symbolicValueFactory(leftSymbol, rightSymbol));
+
+            return programState
+                .PopValue(out leftSymbol)
+                .PopValue(out rightSymbol)
+                .PushValue(svFactory(leftSymbol, rightSymbol));
         }
 
         private ProgramState VisitBooleanBinaryOpAssignment(ProgramState programState, AssignmentExpressionSyntax assignment,
@@ -508,8 +548,10 @@ namespace SonarLint.Helpers.FlowAnalysis.CSharp
 
             SymbolicValue leftSymbol;
             SymbolicValue rightSymbol;
-            var newProgramState = programState.PopValue(out leftSymbol);
-            newProgramState = newProgramState.PopValue(out rightSymbol);
+
+            var newProgramState = programState
+                .PopValue(out leftSymbol)
+                .PopValue(out rightSymbol);
 
             var sv = symbolicValueFactory(leftSymbol, rightSymbol);
             newProgramState = newProgramState.PushValue(sv);

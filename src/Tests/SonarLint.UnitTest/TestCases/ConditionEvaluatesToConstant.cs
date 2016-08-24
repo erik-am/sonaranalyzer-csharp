@@ -260,7 +260,7 @@ namespace Tests.Diagnostics
         public void M()
         {
             var o1 = GetObject();
-            var o2 = null;
+            object o2 = null;
             if (o1 != null)
             {
                 if (o1.ToString() != null)
@@ -430,6 +430,209 @@ namespace Tests.Diagnostics
             else
             {
                 if (b) { }  // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+            }
+        }
+
+        public void EqRelations(bool a, bool b)
+        {
+            if (a == b)
+            {
+                if (b == a) { }    // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+                if (b == !a) { }   // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+                if (!b == !!a) { } // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+                if (!(a == b)) { } // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+            }
+            else
+            {
+                if (b != a) { }    // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+                if (b != !a) { }   // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+                if (!b != !!a) { } // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+            }
+
+            if (a != b)
+            {
+                if (b == a) { } // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+            }
+            else
+            {
+                if (b != a) { } // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+            }
+        }
+
+        public void RelationshipWithConstraint(bool a, bool b)
+        {
+            if (a == b && a) { if (b) { } } // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+//                                 ^
+            if (a != b && a) { if (b) { } } // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+//                                 ^
+            if (a && b) { if (a == b) { } } // Noncompliant
+//                            ^^^^^^
+            if (a && b && a == b) {  } // Noncompliant
+//                        ^^^^^^
+        }
+
+        private static void BackPropagation(object a, object b)
+        {
+            if (a == b && b == null)
+            {
+                a.ToString();
+            }
+        }
+
+        public void RefEqualsImpliesValueEquals(object a, object b)
+        {
+            if (object.ReferenceEquals(a, b))
+            {
+                if (object.Equals(a, b)) { }    // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+                if (Equals(a, b)) { }           // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+                if (a.Equals(b)) { }            // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+            }
+
+            if (this == a)
+            {
+                if (this.Equals(a)) { } // Noncompliant
+                if (Equals(a)) { }      // Noncompliant
+            }
+        }
+
+        public void ValueEqualsDoesNotImplyRefEquals(object a, object b)
+        {
+            if (object.Equals(a, b)) // 'a' could override Equals, so this is not a ref equality check
+            {
+                if (a == b) { } // Compliant
+            }
+        }
+
+        public void ReferenceEqualsMethodCalls(object a, object b)
+        {
+            if (object.ReferenceEquals(a, b))
+            {
+                if (a == b) { } // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+            }
+
+            if (a == b)
+            {
+                if (object.ReferenceEquals(a, b)) { } // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+            }
+        }
+
+        public void ReferenceEqualsMethodCallWithOpOverload(ConditionEvaluatesToConstant a, ConditionEvaluatesToConstant b)
+        {
+            if (object.ReferenceEquals(a, b))
+            {
+                if (a == b) { } // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+            }
+
+            if (a == b)
+            {
+                if (object.ReferenceEquals(a, b)) { } // Compliant, == is doing a value comparison above.
+            }
+        }
+
+        public void ReferenceEquals(object a, object b)
+        {
+            if (object.ReferenceEquals(a, b)) { }
+
+            if (object.ReferenceEquals(a, a)) { } // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+
+            a = null;
+            if (object.ReferenceEquals(null, a)) { } // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+
+            if (object.ReferenceEquals(null, new object())) { } // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+
+            int i = 10;
+            if (object.ReferenceEquals(i, i)) { } // Noncompliant because of boxing {{Change this condition so that it does not always evaluate to "false".}}
+
+            int? ii = null;
+            int? jj = null;
+            if (object.ReferenceEquals(ii, jj)) { } // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+
+            jj = 10;
+            if (object.ReferenceEquals(ii, jj)) { } // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+        }
+
+        public void ReferenceEqualsBool(bool a, bool b)
+        {
+            if (object.ReferenceEquals(a, b)) { } // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+        }
+
+        public void ReferenceEqualsNullable(int? ii, int? jj)
+        {
+            if (object.ReferenceEquals(ii, jj)) { } // Compliant, they might be both null
+            jj = 1;
+            if (object.ReferenceEquals(ii, jj)) { } // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+        }
+
+        public override bool Equals(object obj)
+        {
+            return base.Equals(obj);
+        }
+
+        public static bool operator==(ConditionEvaluatesToConstant a, ConditionEvaluatesToConstant b)
+        {
+            return false;
+        }
+
+        public void StringEmpty()
+        {
+            string s = null;
+            if (string.IsNullOrEmpty(s)) { } // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+            if (string.IsNullOrWhiteSpace(s)) { } // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+            if (string.IsInterned(s)) { }
+            s = "";
+            if (string.IsNullOrEmpty(s)) { }
+            if (string.IsNullOrWhiteSpace(s)) { }
+        }
+
+        public void Comparisons(int i, int j)
+        {
+            if (i < j)
+            {
+                if (j < i) { }  // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+                if (j <= i) { } // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+                if (j == i) { } // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+                if (j != i) { } // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+            }
+
+            if (i <= j)
+            {
+                if (j < i) { }  // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+                if (j <= i)
+                {
+                    if (j == i) { } // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+                    if (j != i) { } // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+                }
+                if (j == i)
+                {
+                    if (i >= j) { } // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+                }
+                if (j != i)
+                {
+                    if (i >= j) { } // Noncompliant {{Change this condition so that it does not always evaluate to "false".}}
+                }
+            }
+        }
+
+        int ValueEquals(int i, int j)
+        {
+            if (i == j)
+            {
+                if (Equals(i, j)) { } // Noncompliant
+                if (i.Equals(j)) { }  // Noncompliant
+            }
+        }
+
+        void DefaultExpression(object o)
+        {
+            if (default(o) == null) { } // Compliant
+        }
+
+        void ConditionalAccessNullPropagation(object o)
+        {
+            if (o == null)
+            {
+                if (o?.ToString() == null) { } // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
+                if (o?.GetHashCode() == null) { } // Noncompliant {{Change this condition so that it does not always evaluate to "true".}}
             }
         }
     }

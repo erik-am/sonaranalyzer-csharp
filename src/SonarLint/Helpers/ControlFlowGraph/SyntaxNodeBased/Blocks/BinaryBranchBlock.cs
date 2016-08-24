@@ -23,10 +23,10 @@ using System;
 
 namespace SonarLint.Helpers.FlowAnalysis.Common
 {
-    public sealed class BinaryBranchBlock : BranchBlock
+    public class BinaryBranchBlock : BranchBlock
     {
         internal BinaryBranchBlock(SyntaxNode branchingNode, Block trueSuccessor, Block falseSuccessor)
-            :base(branchingNode, trueSuccessor, falseSuccessor)
+            : base(branchingNode, trueSuccessor, falseSuccessor)
         {
             if (trueSuccessor == null)
             {
