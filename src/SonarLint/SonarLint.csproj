@@ -160,6 +160,7 @@
     <Compile Include="Rules\FieldShouldNotBePublicBase.cs" />
     <Compile Include="Rules\FlagsEnumWithoutInitializerBase.cs" />
     <Compile Include="Rules\FlagsEnumZeroMemberBase.cs" />
+    <Compile Include="Rules\FunctionComplexityBase.cs" />
     <Compile Include="Rules\MultipleVariableDeclarationBase.cs" />
     <Compile Include="Rules\MultipleVariableDeclarationCodeFixProviderBase.cs" />
     <Compile Include="Rules\OptionalParameterBase.cs" />
