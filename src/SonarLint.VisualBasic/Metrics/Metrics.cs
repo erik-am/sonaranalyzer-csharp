@@ -202,6 +202,7 @@ namespace SonarLint.Common.VisualBasic
             SyntaxKind.DeclareSubStatement,
             SyntaxKind.DeclareFunctionStatement,
             SyntaxKind.SubNewStatement,
+            SyntaxKind.OperatorStatement,
 
             SyntaxKind.IfStatement,
             SyntaxKind.SingleLineIfStatement,
@@ -214,8 +215,7 @@ namespace SonarLint.Common.VisualBasic
             SyntaxKind.ForStatement,
             SyntaxKind.ForEachStatement,
 
-            SyntaxKind.ThrowStatement,
-            SyntaxKind.TryStatement,
+            SyntaxKind.CatchStatement,
 
             SyntaxKind.ErrorStatement,
 
@@ -246,8 +246,6 @@ namespace SonarLint.Common.VisualBasic
             SyntaxKind.ContinueWhileStatement,
 
             SyntaxKind.StopStatement,
-
-            SyntaxKind.ReturnStatement,
 
             SyntaxKind.AndAlsoExpression,
             SyntaxKind.OrElseExpression,

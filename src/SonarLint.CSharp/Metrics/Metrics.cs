@@ -102,18 +102,7 @@ namespace SonarLint.Common.CSharp
                         n =>
                             // TODO What about the null coalescing operator?
                             ComplexityIncreasingKinds.Contains(n.Kind()) ||
-                            IsReturnButNotLast(n) ||
                             IsFunctionWithBody(n));
-        }
-        private bool IsReturnButNotLast(SyntaxNode node)
-        {
-            return node.IsKind(SyntaxKind.ReturnStatement) && !IsLastStatement(node);
-        }
-        private bool IsLastStatement(SyntaxNode node)
-        {
-            var nextToken = node.GetLastToken().GetNextToken();
-            return nextToken.Parent.IsKind(SyntaxKind.Block) &&
-                IsFunction(nextToken.Parent.Parent);
         }
 
         private static readonly SyntaxKind[] TriviaKinds =

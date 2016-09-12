@@ -422,8 +422,8 @@ End Class").Should().BeEquivalentTo(1, 2, 3, 4, 5, 6, 7, 8);
             Complexity(AnalyzerLanguage.CSharp, "abstract class MyClass { abstract void MyMethod(); }").Should().Be(0);
             Complexity(AnalyzerLanguage.CSharp, "class MyClass { void MyMethod() { } }").Should().Be(1);
             Complexity(AnalyzerLanguage.CSharp, "class MyClass { void MyMethod() { return; } }").Should().Be(1);
-            Complexity(AnalyzerLanguage.CSharp, "class MyClass { void MyMethod() { return; return; } }").Should().Be(2);
-            Complexity(AnalyzerLanguage.CSharp, "class MyClass { void MyMethod() { { return; } } }").Should().Be(2);
+            Complexity(AnalyzerLanguage.CSharp, "class MyClass { void MyMethod() { return; return; } }").Should().Be(1);
+            Complexity(AnalyzerLanguage.CSharp, "class MyClass { void MyMethod() { { return; } } }").Should().Be(1);
             Complexity(AnalyzerLanguage.CSharp, "class MyClass { void MyMethod() { if (false) { } } }").Should().Be(2);
             Complexity(AnalyzerLanguage.CSharp, "class MyClass { void MyMethod() { if (false) { } else { } } }").Should().Be(2);
             Complexity(AnalyzerLanguage.CSharp, "class MyClass { void MyMethod(int p) { switch (p) { default: break; } } }").Should().Be(2);
@@ -446,8 +446,8 @@ End Class").Should().BeEquivalentTo(1, 2, 3, 4, 5, 6, 7, 8);
             Complexity(AnalyzerLanguage.VisualBasic, "Class MyClass \n End Class").Should().Be(0);
             Complexity(AnalyzerLanguage.VisualBasic, "MustInherit Class MyClass \n Private MustOverride Sub MyMethod() \n End Class").Should().Be(1);
             Complexity(AnalyzerLanguage.VisualBasic, "Class MyClass \n Sub MyMethod() \n End Sub \n End Class").Should().Be(1);
-            Complexity(AnalyzerLanguage.VisualBasic, "Class MyClass \n Sub MyMethod() \n Return \n End Sub \n End Class").Should().Be(2);
-            Complexity(AnalyzerLanguage.VisualBasic, "Class MyClass \n Sub MyMethod() \n Return \n Return \n End Sub \n End Class").Should().Be(3);
+            Complexity(AnalyzerLanguage.VisualBasic, "Class MyClass \n Sub MyMethod() \n Return \n End Sub \n End Class").Should().Be(1);
+            Complexity(AnalyzerLanguage.VisualBasic, "Class MyClass \n Sub MyMethod() \n Return \n Return \n End Sub \n End Class").Should().Be(1);
             Complexity(AnalyzerLanguage.VisualBasic, "Class MyClass \n Sub MyMethod() \n If False Then \n End If \n End Sub \n End Class").Should().Be(2);
             Complexity(AnalyzerLanguage.VisualBasic, "Class MyClass \n Sub MyMethod() \n If False Then \n Else \n End If \n End Sub \n End Class").Should().Be(2);
             Complexity(AnalyzerLanguage.VisualBasic, "Class MyClass \n Sub MyMethod() \n Select Case p \n Case Else \n Exit Select \n End Select \n End Sub \n End Class").Should().Be(2);
@@ -474,15 +474,15 @@ End Class").Should().BeEquivalentTo(1, 2, 3, 4, 5, 6, 7, 8);
             Complexity(AnalyzerLanguage.VisualBasic, "Module Module1\n Class Foo\n Function Bar() \n Return 0\n End Function \n End Class\n End Module").Should().Be(1);
             Complexity(AnalyzerLanguage.VisualBasic,
                 "Module Module1\n Class Foo\n Function Bar() \n If False Then \n Return 1 \n Else \n Return 0 " +
-                "\n End If\n End Function\n End Class\n End Module").Should().Be(4);
-            Complexity(AnalyzerLanguage.VisualBasic, "Module Module1\n Class Foo\n Sub Foo() \n Dim foo = Sub() Return 42\n End Sub\n End Class\n End Module").Should().Be(2);
+                "\n End If\n End Function\n End Class\n End Module").Should().Be(2);
+            Complexity(AnalyzerLanguage.VisualBasic, "Module Module1\n Class Foo\n Sub Foo() \n Dim foo = Sub() Return 42\n End Sub\n End Class\n End Module").Should().Be(1);
             Complexity(AnalyzerLanguage.VisualBasic, "Module Module1\n Class Foo\n ReadOnly Property MyProp \n Get \n Return \"\" \n End Get \n End Property\n End Class\n End Module").Should().Be(0);
             Complexity(AnalyzerLanguage.VisualBasic, "Module Module1\n Class Foo\n Sub Foo() \n Dim Foo = If(True, True, False)\n End Sub\n End Class\n End Module").Should().Be(1);
             Complexity(AnalyzerLanguage.VisualBasic, "Module Module1\n Class Foo\n Sub Foo() \n Dim Foo = Function() 0\n End Sub\n End Class\n End Module").Should().Be(1);
             Complexity(AnalyzerLanguage.VisualBasic,
                 "Module Module1\n Class Foo\n Sub Foo() \n Dim Foo = Function() \n Return False \n " +
                 "End Function\n End Sub\n End Class\n End Module").Should().Be(1);
-            Complexity(AnalyzerLanguage.VisualBasic, "Module Module1\n Class Foo\n Sub Foo() \n Throw New AccessViolationException()\n End Sub\n End Class\n End Module").Should().Be(2);
+            Complexity(AnalyzerLanguage.VisualBasic, "Module Module1\n Class Foo\n Sub Foo() \n Throw New AccessViolationException()\n End Sub\n End Class\n End Module").Should().Be(1);
             Complexity(AnalyzerLanguage.VisualBasic, "Module Module1\n Class Foo\n Sub Foo() \n GoTo Foo\n End Sub\n End Class\n End Module").Should().Be(2);
         }
 
